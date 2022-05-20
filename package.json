@@ -1,0 +1,24 @@
+{
+  "name": "greenflag",
+  "version": "1.0.0",
+  "description": "A command line program to view NASCAR timing and scoring",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JacenBoy/green-flag.git"
+  },
+  "author": "JacenBoy",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/JacenBoy/green-flag/issues"
+  },
+  "homepage": "https://github.com/JacenBoy/green-flag#readme",
+  "dependencies": {
+    "neo-blessed": "^0.2.0",
+    "node-fetch": "^2.6.7"
+  }
+}
