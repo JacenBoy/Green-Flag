@@ -1,6 +1,3 @@
-const series = "trucks";
-const raceid = "5226";
-
 const fetch = require("node-fetch");
 const blessed = require("neo-blessed");
 
@@ -61,64 +58,70 @@ screen.key(['escape', 'q', 'C-c'], () => {
   return process.exit(0);
 });
 
-let scoringurl;
-switch (series.toLowerCase()) {
-  case "trucks":
-    scoringurl = `https://www.nascar.com/live/feeds/series_3/${raceid}/live_feed.json`;
-    break;
-  case "xfinity":
-    scoringurl = `https://www.nascar.com/live/feeds/series_2/${raceid}/live_feed.json`;
-    break;
-  case "cup":
-    scoringurl = `https://www.nascar.com/live/feeds/series_1/${raceid}/live_feed.json`;
-    break;
-  default:
-    console.error("Invalid series provided");
-    process.exit(0);
-}
-
 (async () => {
-  while (true) {
-    const scoring = await fetch(scoringurl).then(res => res.json());
-
-    eventBox.setText(`${scoring.run_name}\n${scoring.track_name}`);
-
-    lapsBox.setText(`Lap ${scoring.lap_number < scoring.laps_in_race ? scoring.lap_number + 1 : scoring.lap_number} / ${scoring.laps_in_race}\n${scoring.laps_to_go} to go`);
-    switch (scoring.flag_state) {
-      case 1:
-        lapsBox.style.bg = "green";
-        lapsBox.style.fg = "black";
-        break;
-      case 2:
-      case 8:
-        lapsBox.style.bg = "yellow";
-        lapsBox.style.fg = "black";
-        break;
-      case 3:
-        lapsBox.style.bg = "red";
-        lapsBox.style.fg = "white";
-        break;
-      case 5:
-        lapsBox.style.bg = "white";
-        lapsBox.style.fg = "black";
-        break;
-      default:
-        lapsBox.style.bg = "black";
-        lapsBox.style.fg = "white";
+  const year = new Date().getFullYear()
+  const schedules = {};
+  schedules.trucks = await fetch(`https://www.nascar.com/cacher/${year}/3/race_list_basic.json`).then(res => res.json());
+  schedules.xfinity = await fetch(`https://www.nascar.com/cacher/${year}/2/race_list_basic.json`).then(res => res.json());
+  schedules.cup = await fetch(`https://www.nascar.com/cacher/${year}/1/race_list_basic.json`).then(res => res.json());
+  schedules.array = [].concat(schedules.trucks, schedules.xfinity, schedules.cup);
+  let scoringurl;
+  schedules.array.every(race => {
+    const today = new Date();
+    const raceDate = new Date(race.tunein_date);
+    if (today.getDate() ==  raceDate.getDate() && today.getMonth() ==  raceDate.getMonth() && today.getFullYear() ==  raceDate.getFullYear()) {
+      scoringurl = `https://www.nascar.com/live/feeds/series_${race.series_id}/${race.race_id}/live_feed.json`;
+      return false;
     }
+    return true
+  });
 
-    const drivers = scoring.vehicles.sort((a,b) => (a.running_position > b.running_position) ? 1 : -1);
-    for (i=0;i<drivers.length;i++) {
-      let delta;
-      if (drivers[i].running_position == 1) delta = "Leader";
-      else if (drivers[i].status == 2) delta = "Off";
-      else if (drivers[i].status == 3) delta = "Out"; 
-      else if (drivers[i].delta.toString().indexOf("-") != -1) delta = `${drivers[i].delta} lap${Math.abs(drivers[i].delta) == 1 ? "" : "s"}`;
-      else delta = `-${drivers[i].delta}`;
-      scoringBox.setLine(i, `${drivers[i].running_position.toString().padStart(2, " ")}.\t${drivers[i].vehicle_number.toString().padStart(2, " ")}\t${drivers[i].driver.full_name.replace(" #", "").replace("(i)", "").padEnd(40, " ")}\t${delta.padEnd(10, " ")}`);
-    }
-
+  if (!scoringurl) {
+    eventBox.setText("No race found for today");
     screen.render();
-    await sleep(5000);
+  } else {
+    while (true) {
+      const scoring = await fetch(scoringurl).then(res => res.json());
+  
+      eventBox.setText(`${scoring.run_name}\n${scoring.track_name}`);
+  
+      lapsBox.setText(`Lap ${scoring.lap_number < scoring.laps_in_race ? scoring.lap_number + 1 : scoring.lap_number} / ${scoring.laps_in_race}\n${scoring.laps_to_go} to go`);
+      switch (scoring.flag_state) {
+        case 1:
+          lapsBox.style.bg = "green";
+          lapsBox.style.fg = "black";
+          break;
+        case 2:
+        case 8:
+          lapsBox.style.bg = "yellow";
+          lapsBox.style.fg = "black";
+          break;
+        case 3:
+          lapsBox.style.bg = "red";
+          lapsBox.style.fg = "white";
+          break;
+        case 5:
+          lapsBox.style.bg = "white";
+          lapsBox.style.fg = "black";
+          break;
+        default:
+          lapsBox.style.bg = "black";
+          lapsBox.style.fg = "white";
+      }
+  
+      const drivers = scoring.vehicles.sort((a,b) => (a.running_position > b.running_position) ? 1 : -1);
+      for (i=0;i<drivers.length;i++) {
+        let delta;
+        if (drivers[i].running_position == 1) delta = "Leader";
+        else if (drivers[i].status == 2) delta = "Off";
+        else if (drivers[i].status == 3) delta = "Out"; 
+        else if (drivers[i].delta.toString().indexOf("-") != -1) delta = `${drivers[i].delta} lap${Math.abs(drivers[i].delta) == 1 ? "" : "s"}`;
+        else delta = `-${drivers[i].delta}`;
+        scoringBox.setLine(i, `${drivers[i].running_position.toString().padStart(2, " ")}.\t${drivers[i].vehicle_number.toString().padStart(2, " ")}\t${drivers[i].driver.full_name.replace(" #", "").replace("(i)", "").padEnd(40, " ")}\t${delta.padEnd(10, " ")}`);
+      }
+  
+      screen.render();
+      await sleep(5000);
+    }
   }
 })();
