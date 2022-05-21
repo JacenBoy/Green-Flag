@@ -36,6 +36,7 @@ const lapsBox = blessed.box({
   top: "0%",
   left: "75%",
   align: "center",
+  valign: "middle",
   border: {
     type: "line"
   }
@@ -48,6 +49,7 @@ const eventBox = blessed.box({
   top: "0%",
   left: "0%",
   align: "center",
+  valign: "middle",
   border: {
     type: "line"
   }
