@@ -1,8 +1,11 @@
+// Load the external libraries we'll be using
 const fetch = require("node-fetch");
 const blessed = require("neo-blessed");
 
+// Define a sleep() convenience function
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+// Initialize the screen object
 const screen = blessed.screen({
   autoPadding: true,
   smartCSR: true,
@@ -10,6 +13,8 @@ const screen = blessed.screen({
   title: "Green Flag!"
 });
 
+// Add scoring box
+// This contains information on drivers and their running positions
 const scoringBox = blessed.box({
   width: "75%",
   height: "85%",
@@ -30,6 +35,9 @@ const scoringBox = blessed.box({
 });
 screen.append(scoringBox);
 
+// Add laps remaining box
+// Contains information about how many laps are remaining and the
+// track status
 const lapsBox = blessed.box({
   width: "25%",
   height: "15%",
@@ -43,21 +51,24 @@ const lapsBox = blessed.box({
 });
 screen.append(lapsBox);
 
-const eventBox = blessed.log({
+// Add event box
+// Contains the name of the event and the track
+const eventBox = blessed.box({
   width: "75%",
   height: "15%",
   top: "0%",
   left: "0%",
   align: "center",
   valign: "middle",
-  scrollOnInput: "true",
   border: {
     type: "line"
   }
 });
 screen.append(eventBox);
 
-const notesBox = blessed.box({
+// Add notes box
+// Contains information about notable events during the race
+const notesBox = blessed.log({
   width: "25%",
   height: "85%",
   top: "15%",
@@ -68,16 +79,22 @@ const notesBox = blessed.box({
 });
 screen.append(notesBox);
 
+// Set up keybinds to exit the program
 screen.key(['escape', 'q', 'C-c'], () => {
   return process.exit(0);
 });
 
+// We wrap the main application loop in an anonymous self-executing
+// async function to take advantage of async/await syntax
 (async () => {
+  // Grab the schedules for the three major series and see if there
+  // is a race today for any of them
   const year = new Date().getFullYear()
   const schedules = {};
   schedules.trucks = await fetch(`https://www.nascar.com/cacher/${year}/3/race_list_basic.json`).then(res => res.json());
   schedules.xfinity = await fetch(`https://www.nascar.com/cacher/${year}/2/race_list_basic.json`).then(res => res.json());
   schedules.cup = await fetch(`https://www.nascar.com/cacher/${year}/1/race_list_basic.json`).then(res => res.json());
+  // Combine the three shcedules into one array 
   schedules.array = [].concat(schedules.trucks, schedules.xfinity, schedules.cup);
   let seriesInfo = {};
   schedules.array.every(race => {
@@ -87,22 +104,34 @@ screen.key(['escape', 'q', 'C-c'], () => {
       seriesInfo.found = true;
       seriesInfo.sid = race.series_id;
       seriesInfo.rid = race.race_id;
+      // In case of a double-header, check to see if the race has
+      // already finished, so we can load the second race if needed
       if (!race.margin_of_victory) return false;
     }
     return true
   });
 
   if (!seriesInfo.found) {
+    // Display a message if there's no race today
     eventBox.setText("No race found for today");
     screen.render();
   } else {
+    // Main application loop
     while (true) {
+      // Fetch the timing and scoring data
       const scoring = await fetch(`https://www.nascar.com/live/feeds/series_${seriesInfo.sid}/${seriesInfo.rid}/live_feed.json`).then(res => res.json());
+      // Fetch the lap notes or return an empty objecy if there are none
       const racenotes = await fetch(`https://www.nascar.com/cacher/${year}/${seriesInfo.sid}/${seriesInfo.rid}/lap-notes.json`).then(res => res.json()).catch(err => {return {laps: {}}});
   
+      // Set the race name and the track name
       eventBox.setText(`${scoring.run_name}\n${scoring.track_name}`);
   
+      // Display the current lap and how many laps are remaining
       lapsBox.setText(`Lap ${scoring.lap_number < scoring.laps_in_race ? scoring.lap_number + 1 : scoring.lap_number} / ${scoring.laps_in_race}\n${scoring.laps_to_go} to go`);
+      // Also color the box based on the current track condition
+      // 1 - Green; 2 - Yellow; 3 - Red
+      // 4 - Checkered; 5 - White
+      // 8 - Warm-up (pre-race); 9 - Not live
       switch (scoring.flag_state) {
         case 1:
           lapsBox.style.bg = "green";
@@ -126,25 +155,37 @@ screen.key(['escape', 'q', 'C-c'], () => {
           lapsBox.style.fg = "white";
       }
   
+      // Make sure the running order is correctly sorted
       const drivers = scoring.vehicles.sort((a,b) => (a.running_position > b.running_position) ? 1 : -1);
+      // Loop through the running order to display in the scoring box
       for (i=0;i<drivers.length;i++) {
+        // Depending on the status of the driver, we'll display the
+        // time delta
         let delta;
+        // If running position is 1, driver is the leader
         if (drivers[i].running_position == 1) delta = "Leader";
-        else if (drivers[i].status == 2) delta = "Off";
-        else if (drivers[i].status == 3) delta = "Out"; 
+        // If the "status" property is 3, driver has retired the car
+        else if (drivers[i].status == 3) delta = "Out";
+        // If the "delta" property starts with the "-" character, driver is lap(s) down
         else if (drivers[i].delta.toString().indexOf("-") != -1) delta = `${drivers[i].delta} lap${Math.abs(drivers[i].delta) == 1 ? "" : "s"}`;
+        // Otherwise, "delta" property is just in seconds
         else delta = `-${drivers[i].delta}`;
-        scoringBox.setLine(i, `${drivers[i].running_position.toString().padStart(2, " ")}.\t#${drivers[i].vehicle_number.toString().padEnd(2, " ")}\t${drivers[i].driver.full_name.replace(" #", "").replace("(i)", "").padEnd(40, " ")}\t${delta.padEnd(10, " ")}`);
+        // Show running position, car number, driver name, and delta in a tab-spaced format
+        scoringBox.setLine(i, `${drivers[i].running_position.toString().padStart(2, " ")}.\t#${drivers[i].vehicle_number.toString().padEnd(2, " ")}\t${drivers[i].driver.full_name.replace(" #", "").replace("(i)", "").padEnd(30, " ")}\t${delta.padEnd(10, " ")}`);
       }
 
+      // Loop through the lap notes and output them to the
+      // appropriate box
       var j = 0;
       for (const [lap, notes] of Object.entries(racenotes.laps)) {
         notesBox.setLine(j, `Lap ${lap}: ${notes[0].Note}\n`);
         j++;
       }
   
+      // Render all the changes we've made to the screen
       screen.render();
-      await sleep(5000);
+      // Sleep before processing the application loop again
+      await sleep(5 * 1000); // 5 seconds
     }
   }
 })();
