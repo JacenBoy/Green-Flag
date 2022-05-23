@@ -26,6 +26,7 @@ const scoringBox = blessed.box({
   scrollable: true,
   scrollbar: true,
   keys: true,
+  tags: true,
   style: {
     scrollbar: {
       bg: "white",
@@ -47,7 +48,8 @@ const lapsBox = blessed.box({
   valign: "middle",
   border: {
     type: "line"
-  }
+  },
+  tags: true
 });
 screen.append(lapsBox);
 
@@ -62,7 +64,8 @@ const eventBox = blessed.box({
   valign: "middle",
   border: {
     type: "line"
-  }
+  },
+  tags: true
 });
 screen.append(eventBox);
 
@@ -75,7 +78,8 @@ const notesBox = blessed.log({
   left: "75%",
   border: {
     type: "line"
-  }
+  }, 
+  tags: true
 });
 screen.append(notesBox);
 
@@ -177,9 +181,13 @@ screen.key(['escape', 'q', 'C-c'], () => {
       // Loop through the lap notes and output them to the
       // appropriate box
       var j = 0;
+      notesBox.setContent("");
       for (const [lap, notes] of Object.entries(racenotes.laps)) {
-        notesBox.setLine(j, `Lap ${lap}: ${notes[0].Note}\n`);
-        j++;
+        notes.forEach(note => {
+          notesBox.setLine(j, `{yellow-fg}Lap ${lap}:{/} ${note.Note}\n`);
+          j++;
+        });
+        
       }
   
       // Render all the changes we've made to the screen
