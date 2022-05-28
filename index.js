@@ -170,6 +170,8 @@ screen.key(['escape', 'q', 'C-c'], () => {
         if (drivers[i].running_position == 1) delta = "Leader";
         // If the "status" property is 3, driver has retired the car
         else if (drivers[i].status == 3) delta = "Out";
+        // If the "status" property is 6, the driver has taken the car to the garage
+        else if (drivers[i].status == 6) delta = "Off";
         // If the "delta" property starts with the "-" character, driver is lap(s) down
         else if (drivers[i].delta.toString().indexOf("-") != -1) delta = `${drivers[i].delta} lap${Math.abs(drivers[i].delta) == 1 ? "" : "s"}`;
         // Otherwise, "delta" property is just in seconds
